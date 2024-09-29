@@ -1,0 +1,114 @@
+#cloud-config
+ssh_pwauth: false
+
+hostname: ditc-k8s-worker1
+groups:
+  - ubuntu: [root, sys]
+
+users:
+  - default
+  - name: replace-me # replace with your own username
+    groups: sudo
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-rsa replace-me # replace with your own ssh key
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
+apt:
+  sources:
+    influxdb:
+      source: 'deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main'
+
+package_update: true
+package_upgrade: true
+packages:
+  - apt-transport-https 
+  - ca-certificates 
+  - conntrack 
+  - curl 
+  - gawk 
+  - git 
+  - gnupg 
+  - htop 
+  - ipset 
+  - ipvsadm  
+  - jq 
+  - libseccomp2 
+  - linux-headers-raspi 
+  - linux-modules-extra-raspi 
+  - lsb-release 
+  - net-tools 
+  - nfs-common 
+  - openssh-server 
+  - openssl 
+  - sed 
+  - socat 
+  - systemd 
+  - wget
+
+write_files:
+ - path: /etc/modules-load.d/k8s.conf
+   content: |
+     overlay
+     br_netfilter
+     ip_vs
+     ip_vs_rr
+     ip_vs_wrr
+     ip_vs_sh
+     nf_conntrack
+
+ - path: /etc/sysctl.d/k8s.conf
+   content: |
+     net.bridge.bridge-nf-call-iptables  = 1
+     net.bridge.bridge-nf-call-ip6tables = 1
+     net.ipv4.ip_forward                 = 1
+
+ - path: /etc/telegraf/telegraf.conf
+   content: |
+      [[outputs.influxdb_v2]]
+        urls = ["http://localhost:8086"]
+        token = "abcde12345"
+        organization = "your-org"
+        bucket = "rasppi"
+      #In order to monitor both Network interfaces, eth0 and wlan0, uncomment, or add the next:
+      [[inputs.net]]
+      [[inputs.netstat]]
+      [[inputs.file]]
+      files = ["/sys/class/thermal/thermal_zone0/temp"]
+      name_override = "cpu_temperature"
+      data_format = "value"
+      data_type = "integer"
+
+      [[inputs.cpu]]
+      [[inputs.disk]]
+      [[inputs.diskio]]
+      [[inputs.kernel]]
+      [[inputs.mem]]
+      [[inputs.processes]]
+      [[inputs.swap]]
+      [[inputs.system]]
+
+runcmd:
+  - wget -q https://repos.influxdata.com/influxdata-archive_compat.key
+  - echo '393e8779c89ac8d958f81f942f9ad7fb82a25e133faddaf92e15b16e6ac9ce4c influxdata-archive_compat.key' | sha256sum -c && cat influxdata-archive_compat.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
+  - apt update
+  - apt install influxdb2 telegraf
+  - systemctl start influxdb
+  - systemctl enable influxdb
+  - influx setup -u telegraf_admin -p abcde12345 -t abcde12345 -o devsinthecloud -b rasppi -r 360 -f
+  - systemctl start telegraf
+  - systemctl enable telegraf
+  - systemctl reload telegraf
+  - modprobe -- overlay
+  - modprobe -- br_netfilter
+  - modprobe -- ip_vs
+  - modprobe -- ip_vs_rr
+  - modprobe -- ip_vs_wrr
+  - modprobe -- ip_vs_sh
+  - modprobe -- nf_conntrack
+  - sysctl --system
+  - export MASTER_IP=10.54.42.101
+  - export WORKER_IP=10.54.42.102
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent --server=https://${MASTER_IP}:6443 --node-ip=${WORKER_IP} --node-external-ip=${WORKER_IP} --token 12345" sh -s -
+  - sudo reboot
