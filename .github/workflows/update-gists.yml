@@ -1,0 +1,50 @@
+name: Update Gists from Repository
+
+on:
+  push:
+    paths:
+      -  "part2: Create Kubernetes Cluster with K3s and install Cilium and ArgoCD using OpenTofu/**"
+
+jobs:
+  update_gists:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y jq
+
+      - name: Get changed files
+        id: changed_files
+        run: |
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          echo "::set-output name=files::$CHANGED_FILES"
+
+      - name: Read gist mapping
+        id: mapping
+        run: |
+          GIST_MAPPING=$(cat gist_mapping.yml)
+          echo "::set-output name=mapping::$GIST_MAPPING"
+
+      - name: Update Gists
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          # Parse the changed files and mapping
+          FILES_TO_UPDATE=${{ steps.changed_files.outputs.files }}
+          MAPPING=${{ steps.mapping.outputs.mapping }}
+          
+          # Loop through changed files and update corresponding Gists
+          for FILE in $FILES_TO_UPDATE; do
+            GIST_ID=$(echo "$MAPPING" | yq ".gist_mappings[\"$FILE\"]")
+          
+            if [ -n "$GIST_ID" ]; then
+              FILE_CONTENT=$(cat "$FILE")
+              curl -X PATCH "https://api.github.com/gists/$GIST_ID" \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -d "{\"files\": {\"$(basename "$FILE")\": {\"content\": \"$FILE_CONTENT\"}}}"
+            fi
+          done
