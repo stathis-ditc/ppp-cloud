@@ -1,0 +1,12 @@
+controller:
+  replicas: 1
+server:
+  replicas: 1
+repoServer:
+  replicas: 1
+applicationSet:
+  replicaCount: 1
+configs:
+  params:
+    "server.insecure": true
+

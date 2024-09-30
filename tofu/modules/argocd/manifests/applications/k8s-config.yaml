@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-config
+  namespace: argocd
+spec:
+  destination:
+    namespace: '*'
+    server: 'https://kubernetes.default.svc'
+  source:
+    path: config
+    repoURL: 'https://github.com/stathis-ditc/ppp-cloud.git'
+    targetRevision: main
+  project: local-k8s
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
