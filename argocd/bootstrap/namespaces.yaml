@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: connectivity
+  labels:
+    name: connectivity
+    shared-gateway-access: "true"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    name: observability
+    shared-gateway-access: "true"

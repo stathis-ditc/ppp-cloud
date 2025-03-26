@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: prometheus-community-helm-charts
+  source:
+    chart: kube-prometheus-stack
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 69.4.1
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |-
+        grafana:
+          grafana.ini:
+            server: 
+              root_url: https://grafana.ditc.lcldns/
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: observability
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+    automated:
+      selfHeal: true
+      prune: true
